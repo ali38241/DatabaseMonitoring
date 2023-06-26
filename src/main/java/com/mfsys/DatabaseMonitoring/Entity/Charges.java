@@ -1,5 +1,6 @@
 package com.mfsys.DatabaseMonitoring.Entity;
 
+
 public class Charges {
 	private String pch_chrgcode;
 	private String por_orgacode;
