@@ -88,8 +88,9 @@ public class AppController {
 	}
 	
 	@GetMapping("/backup/{type}")
-	 public String backupDatabase(@PathVariable String type) throws IOException {
-		return appService.backup(type);
+	 public void backupDatabase(@PathVariable String type) throws IOException {
+	 appService.backup();
+	 appService.zipMysql(type);
 	}
 	
 	
