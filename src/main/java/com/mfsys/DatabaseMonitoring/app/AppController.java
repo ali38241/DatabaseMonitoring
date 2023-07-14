@@ -23,12 +23,15 @@ import com.mfsys.DatabaseMonitoring.Entity.Charges;
 import com.mfsys.DatabaseMonitoring.Entity.EventEntity;
 import com.mfsys.DatabaseMonitoring.Entity.TransactionType;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 
 
 @CrossOrigin(exposedHeaders="Access-Control-Allow-Origin")
 @RequestMapping("/")
 @RestController
 public class AppController {
+	
 
 	@Autowired
 	private AppService appService;
@@ -57,11 +60,11 @@ public class AppController {
 	}
 	
 //	-----------------------------------------ADD-RECORD---------------------------------
-	@PostMapping("/addcolumns/{dbName}/{type}/{requestBody}")
-	public String savecolumns(@RequestBody String requestBody, @PathVariable String dbName, @PathVariable String type)throws SQLException{
-		Object body = deserializeBody(type, requestBody);
-		return appService.savecolumns(body,dbName,type);
-	}
+//	@PostMapping("/addcolumns/{dbName}/{type}/{requestBody}")
+//	public String addRow(@RequestBody String requestBody, @PathVariable String dbName, @PathVariable String type)throws SQLException{
+//		Object body = deserializeBody(type, requestBody);
+//		return appService.addRow(body, dbName, type);
+//	}
 //	-----------------------------------------DELETE-RECORD---------------------------------
 	@DeleteMapping("/deleteAll/{type}/{dbName}/{requestBodies}")
     public void deleteRow(@RequestBody List<String> requestBodies,
@@ -87,18 +90,39 @@ public class AppController {
 		return appService.getAllData(type);
 	}
 	
+	
+	
+	
+	
+	@PostMapping("/addrow/{event}/{dbName}")
+    public void addRow(@RequestBody String requestBody, @PathVariable String event, @PathVariable String dbName) {
+        Object body = deserializeBody(event, requestBody);
+        appService.addRow(body, event, dbName);
+        
+    }
+	
+	
+	
+	
+	
+	
 	@GetMapping("/backup/{type}")
-	 public void backupDatabase(@PathVariable String type) throws IOException {
-	 appService.backup();
-	 appService.zipMysql(type);
+	 public void backupDatabase(HttpServletResponse response, @PathVariable String type) throws IOException {
+	 if(appService.backup(type)) {
+		 if(type.equals("mysql")) {
+			 if(appService.zipMysql()) {
+				 appService.download(response, type);
+			 }
+		 }else {
+			 if(appService.zipMongo()) {
+				 appService.download(response, type);
+			 }
+		 }
+		 
+	 };
+	 
 	}
-	
-	
-	
-	
-	
-	
-	
+
 	
 //	-------------------------------------Deserialising--------------------------
 	private Object deserializeBody(String type, String requestBody) {
@@ -106,7 +130,7 @@ public class AppController {
 
 		try {
 			if (type.equals("event")) {
-				return objectMapper.readValue(requestBody, EventEntity.class);
+				return objectMapper.readValue(requestBody, EventEntity.LoanEvent.class);
 			} else if (type.equals("transaction_type")) {
 				return objectMapper.readValue(requestBody, TransactionType.class);
 			} else if (type.equals("charges")) {

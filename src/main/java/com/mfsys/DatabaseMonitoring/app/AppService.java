@@ -1,14 +1,13 @@
 package com.mfsys.DatabaseMonitoring.app;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -26,26 +25,33 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.mfsys.DatabaseMonitoring.Entity.Charges;
 import com.mfsys.DatabaseMonitoring.Entity.EventEntity;
+import com.mfsys.DatabaseMonitoring.Entity.EventEntity.LoanEvent;
 import com.mfsys.DatabaseMonitoring.Entity.TransactionType;
+import com.mfsys.DatabaseMonitoring.Repositories.EventRepository;
+import com.mfsys.DatabaseMonitoring.Repositories.TransactionRepository;
 
-import io.micrometer.observation.Observation.Event;
-import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.ZipParameters;
 
 @Service
 public class AppService {
 	@Autowired
 	private final JdbcTemplate jdbcTemplate;
-
 	@Autowired
-	public AppService(JdbcTemplate jdbcTemplate) {
+	private final EventRepository<EventEntity, Integer> loanRepo;
+
+//	private Map<String, ChargesRepository<ChargesEntity, Integer>> chargesRepositories;
+	@Autowired
+	public AppService(JdbcTemplate jdbcTemplate, EventRepository<EventEntity, Integer> loanRepo) {
 		this.jdbcTemplate = jdbcTemplate;
+		this.loanRepo = loanRepo;
 	}
+	
 
 //---------------------------------RETRIEVE DATA-----------------------------
 	public List<Map<String, Object>> getTableData(String dbName, String type) throws SQLException {
@@ -139,8 +145,11 @@ public class AppService {
 					+ " (por_orgacode, ptr_trancode, pet_eventcode, ptr_trandesc, system_generated)")
 					.append(" VALUES ('%s', '%s', '%s', '%s', '%s')");
 
-			String formattedSql = String.format(sql.toString(), tran_type.getPor_orgacode(),
-					tran_type.getPtr_trancode(), tran_type.getPet_eventcode(), tran_type.getPtr_trandesc(),
+			String formattedSql = String.format(sql.toString(), 
+//					tran_type.getPor_orgacode(),
+//					tran_type.getPtr_trancode(), 
+					tran_type.getPet_eventcode(), 
+					tran_type.getPtr_trandesc(),
 					tran_type.getSystem_generated());
 
 			System.out.println(formattedSql);
@@ -216,11 +225,18 @@ public class AppService {
 			StringBuilder sql = new StringBuilder("UPDATE " + tableName + " SET ").append("por_orgacode = '%s', ")
 					.append("ptr_trancode = '%s', ").append("pet_eventcode = '%s', ").append("ptr_trandesc = '%s', ")
 					.append("system_generated = '%s' ")
-					.append("WHERE por_orgacode = '" + tran_type.getPor_orgacode() + "' AND ptr_trancode = '"
-							+ tran_type.getPtr_trancode() + "' AND pet_eventcode='" + tran_type.getPet_eventcode()
+					.append("WHERE por_orgacode = '" + 
+//					tran_type.getPor_orgacode() +
+					 "' AND ptr_trancode = '" + 
+//					tran_type.getPtr_trancode() +
+					 "' AND pet_eventcode='" + 
+					tran_type.getPet_eventcode()
 							+ "'");
-			String formattedSql = String.format(sql.toString(), tran_type.getPor_orgacode(),
-					tran_type.getPtr_trancode(), tran_type.getPet_eventcode(), tran_type.getPtr_trandesc(),
+			String formattedSql = String.format(sql.toString(), 
+//					tran_type.getPor_orgacode(),
+//					tran_type.getPtr_trancode(), 
+					tran_type.getPet_eventcode(), 
+					tran_type.getPtr_trandesc(),
 					tran_type.getSystem_generated());
 
 			System.out.println(formattedSql);
@@ -371,8 +387,8 @@ public class AppService {
 			PreparedStatement statement = connection.prepareStatement(sql);
 			Statement disableConstraintsStmt = connection.createStatement();
 			disableConstraintsStmt.executeUpdate("SET FOREIGN_KEY_CHECKS = 0");
-			statement.setString(1, transEntity.getPor_orgacode());
-			statement.setString(2, transEntity.getPtr_trancode());
+//			statement.setString(1, transEntity.getPor_orgacode());
+//			statement.setString(2, transEntity.getPtr_trancode());
 			statement.setString(3, transEntity.getPet_eventcode());
 			statement.setString(4, transEntity.getPtr_trandesc());
 			statement.setString(5, transEntity.getSystem_generated());
@@ -424,8 +440,8 @@ public class AppService {
 			PreparedStatement statement = connection.prepareStatement(sql);
 			Statement disableConstraintsStmt = connection.createStatement();
 			disableConstraintsStmt.executeUpdate("SET FOREIGN_KEY_CHECKS = 0");
-			statement.setString(1, transaction.getPtr_trancode());
-			statement.setString(2, transaction.getPor_orgacode());
+//			statement.setString(1, transaction.getPtr_trancode());
+//			statement.setString(2, transaction.getPor_orgacode());
 			int rowsAffected = statement.executeUpdate();
 			System.out.println(rowsAffected + " :rows deleted");
 			statement.close();
@@ -445,6 +461,35 @@ public class AppService {
 		}
 	}
 
+//	public void addRow(EventEntity event) {
+//        eventRepository.save(event);
+//    }
+	
+	
+	
+	
+	
+
+	public void addRow(Object body, String type, String dbName) {
+		if (type.equals("event")) {
+			switch (dbName) {
+			case "loan":
+				EventEntity.LoanEvent event = (EventEntity.LoanEvent) body;
+				loanRepo.save(event);
+				break;
+			case "depsoit":
+				break;
+			case "generalledger":
+				break;
+			}
+		}
+	}
+
+	
+	
+	
+	
+	
 //----------------------------------------Get All Data-----------------------------------
 	public List<Map<String, Object>> getAllData(String type) {
 		Map<String, Object> response = new HashMap<>();
@@ -483,228 +528,169 @@ public class AppService {
 
 	}
 
-	String mongoPath = System.getProperty("user.home") + "\\Downloads\\Backup\\mongo";
-	String mysqlPath = System.getProperty("user.home") + "\\Downloads\\Backup\\mysql";
+	String basePath = System.getProperty("user.home") + "\\Downloads\\Backup";
+	Path path = Paths.get(basePath);
+	Path mongoPath = path.resolve("mongo");
+	Path mysqlPath = path.resolve("mysql");
 
-//	public String backup(String type) throws IOException {
-//		String result = "";
-//
-//		List<String> mongoDb = Arrays.asList("crm", "security", "loan", "deposit", "generalledger", "configuration");
-//
-//		if (type.equals("mongo")) {
-//			File backPath = new File(mongoPath);
-//			if (!backPath.exists()) {
-//				backPath.mkdirs();
-//			}
-//			for (String db : mongoDb) {
-//				ProcessBuilder pb = new ProcessBuilder("mongodump", "--db", db, "--out", mongoPath);
-//				try {
-//				 pb.start();	
-//
-//				} catch (Exception e) {
-//					System.out.println(e.getMessage());
-//				}
-//			}
-//			
-//			zipMongo(mongoPath);
-//
-//			System.out.println(result);
-//			return result;
-//		} else if (type.equals("mysql")) {
-//			File backPath = new File(mysqlPath);
-//			if (!backPath.exists()) {
-//				backPath.mkdirs();
-//			}
-//				ProcessBuilder pb = new ProcessBuilder("mysqldump", "-uroot", "-proot", "--all-databases", "-r",
-//						mysqlPath +"\\"+ "mysql" + ".sql");
-//				System.out.println(mysqlPath);
-//				try {
-//					Process p = pb.start();
-//					int exitcode = p.waitFor();
-//					System.out.println("Exit code: " + exitcode);
-//					if (exitcode == 0) {
-//						System.out.println("Sql backup created successfully");
-//						result = "mysql success";
-//					} else {
-//						result = "backup fail";
-//					}
-//					p.destroy();
-//				} catch (Exception e) {
-//					System.out.println(e.getMessage());
-//				}
-//				
-////			}
-//			zipMysql(result);
-//		} else {
-//			return "invalid type";
-//		}
-//		System.out.println(result);
-//		return result;
-//
-//	}
-//
-//	public String zipMongo(String path) throws IOException {
-//		byte[] buffer = new byte[1024];
-//		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//		ZipOutputStream zos = new ZipOutputStream(baos);
-//		File directory = new File(path);
-//		if (directory.isDirectory()) {
-//			String zipFileName = "backup_" + "mongo" + ".zip";
-//			for (File subDirectory : directory.listFiles()) {
-//				if (subDirectory.isDirectory()) {
-//					for (File file : subDirectory.listFiles()) {
-//						FileInputStream fis = new FileInputStream(file);
-//						zos.putNextEntry(new ZipEntry(subDirectory.getName() + "\\" + file.getName()));
-//						int length;
-//						while ((length = fis.read(buffer)) > 0) {
-//							zos.write(buffer, 0, length);
-//						}
-//						zos.closeEntry();
-//						fis.close();
-//					}
-//				}
-//			}
-//			zos.close();
-//			System.out.println("Zip file created successfully: " + zipFileName);
-//		} else {
-//			throw new IllegalArgumentException("Directory not found: " + path);
-//		}
-//
-//		zos.close();
-//		baos.close();
-//
-//		HttpServletResponse response = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
-//				.getResponse();
-//		response.setContentType("application/zip");
-//		response.setHeader("Content-Disposition", "attachment; filename=\"" + "backup_mongo.zip\"");
-//
-//		ServletOutputStream sos = response.getOutputStream();
-//		sos.write(baos.toByteArray());
-//		sos.flush();
-//		sos.close();
-//
-//		return ("Created zip file: " + path + ".zip \n");
-//	}
-//
-//	public void zipMysql(String path) throws IOException {
-//		byte[] buffer = new byte[1024];
-//		File backupFolder = new File(mysqlPath);
-//		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//		ZipOutputStream zos = new ZipOutputStream(baos);
-//
-//		File[] filesToZip = backupFolder.listFiles();
-//		for (File file : filesToZip) {
-//			FileInputStream fis = new FileInputStream(file);
-//			zos.putNextEntry(new ZipEntry(file.getName()));
-//			int length;
-//			while ((length = fis.read(buffer)) > 0) {
-//				zos.write(buffer, 0, length);
-//			}
-//			zos.closeEntry();
-//			fis.close();
-//		}
-//
-//		zos.close();
-//		byte[] zipBytes = baos.toByteArray();
-//		baos.close();
-//
-//		HttpServletResponse response = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
-//				.getResponse();
-//		response.setContentType("application/zip");
-//		response.setHeader("Content-Disposition", "attachment; filename=\"" + "backup_mysql.zip" + "\"");
-//		response.setContentLength(zipBytes.length);
-//
-//		OutputStream os = response.getOutputStream();
-//		os.write(zipBytes);
-//		os.flush();
-//		os.close();
-//	}
-
-//	private void zipFile(String fileName) throws IOException {
-//		String sourceFile = mysqlPath;
-//		FileOutputStream fos = new FileOutputStream("mysql.zip");
-//		ZipOutputStream zipOut = new ZipOutputStream(fos);
-//
-//		File fileToZip = new File(sourceFile);
-//		zipOut.close();
-//		fos.close();
-//		if (fileToZip.isHidden()) {
-//			return;
-//		}
-//		if (fileToZip.isDirectory()) {
-//			if (fileName.endsWith("/")) {
-//				zipOut.putNextEntry(new ZipEntry(fileName));
-//				zipOut.closeEntry();
-//			} else {
-//				zipOut.putNextEntry(new ZipEntry(fileName + "/"));
-//				zipOut.closeEntry();
-//			}
-//			File[] children = fileToZip.listFiles();
-//			for (File childFile : children) {
-//				zipFile(childFile, fileName + "/" + childFile.getName(), zipOut);
-//			}
-//			return;
-//		}
-//		FileInputStream fis = new FileInputStream(fileToZip);
-//		ZipEntry zipEntry = new ZipEntry(fileName);
-//		zipOut.putNextEntry(zipEntry);
-//		byte[] bytes = new byte[1024];
-//		int length;
-//		while ((length = fis.read(bytes)) >= 0) {
-//			zipOut.write(bytes, 0, length);
-//		}
-//		fis.close();
-//	}
-	public void backup() {
-	    String[] databases = {"onlinebanking", "deposit", "configuration", "loan", "generalledger"};
-	    String backupPath = "C:\\Users\\mmghh\\Downloads\\Backup\\mysql\\mysql.sql";
-	    
-	    List<String> command = new ArrayList<>();
-	    command.add("mysqldump");
-	    command.add("-uroot");
-	    command.add("-proot");
-	    command.add("--databases");
-	    command.addAll(Arrays.asList(databases));
-	    command.add("--result-file=" + backupPath);
-
-	    ProcessBuilder pb = new ProcessBuilder(command);
-	    System.out.println(pb.command());
-	    System.out.println(mysqlPath);
-
-	    try {
-	        Process p = pb.start();
-	        int exitcode = p.waitFor();
-	        System.out.println("Exit code: " + exitcode);
-	        if (exitcode == 0) {
-	            System.out.println("SQL backup created successfully");
-	        } else {
-	            System.out.println("Error creating SQL backup");
-	        }
-	    } catch (Exception e) {
-	        System.out.println(e.getMessage());
-	    }
-	}
-	
-	public void zipMysql(String type) throws IOException {
-		String sourceFile = mysqlPath+"\\mysql.sql";
-		String x = mysqlPath+"\\mysql.zip";
-		File outPut = new File(x);
-		FileOutputStream fos = new FileOutputStream(x);
-		ZipOutputStream zipOut = new ZipOutputStream(fos);
-
-		File fileToZip = new File(sourceFile);
-		FileInputStream fis = new FileInputStream(fileToZip);
-		ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-		zipOut.putNextEntry(zipEntry);
-
-		byte[] bytes = new byte[1024];
-		int length;
-		while ((length = fis.read(bytes)) >= 0) {
-			zipOut.write(bytes, 0, length);
+	public void download(HttpServletResponse response, String type) throws FileNotFoundException, IOException {
+		String downloadFolder;
+		String fileName;
+		if (type.equals("mysql")) {
+			downloadFolder = mysqlPath.toString() + File.separator + type + ".zip";
+			fileName = "mysql.zip";
+		} else {
+			downloadFolder = mongoPath.toString() + File.separator + type + ".zip";
+			fileName = "mongo.zip";
 		}
 
-		zipOut.close();
-		fis.close();
-		fos.close();
+		File file = new File(downloadFolder);
+
+		if (file.exists()) {
+			response.setContentType("application/octet-stream");
+			response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
+
+			try (FileInputStream fileInputStream = new FileInputStream(file);
+					OutputStream outputStream = response.getOutputStream()) {
+
+				byte[] buffer = new byte[4096];
+				int bytesRead;
+				while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+					outputStream.write(buffer, 0, bytesRead);
+				}
+			}
+			response.flushBuffer();
+		} else {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND);
+		}
 	}
+
+	public boolean backup(String type) {
+		boolean result = false;
+		if (type.equals("mysql")) {
+			File mysqlDir = new File(mysqlPath.toString());
+			if (!mysqlDir.exists()) {
+				mysqlDir.mkdirs();
+			}
+			String[] databases = { "onlinebanking", "deposit", "configuration", "loan", "generalledger" };
+			String backupPath = "C:\\Users\\mmghh\\Downloads\\Backup\\mysql\\mysql.sql";
+
+			List<String> command = new ArrayList<>();
+			command.add("mysqldump");
+			command.add("-uroot");
+			command.add("-proot");
+			command.add("--databases");
+			command.addAll(Arrays.asList(databases));
+			command.add("--result-file=" + backupPath);
+
+			ProcessBuilder pb = new ProcessBuilder(command);
+			pb.redirectErrorStream(true);
+			System.out.println(pb.command());
+			System.out.println(mysqlPath);
+
+			try {
+				Process p = pb.start();
+				int exitcode = p.waitFor();
+				System.out.println("Exit code: " + exitcode);
+				if (exitcode == 0) {
+					System.out.println("SQL backup created successfully");
+					result = true;
+				} else {
+					System.out.println("Error creating SQL backup");
+				}
+			} catch (Exception e) {
+				System.out.println(e.getMessage());
+			}
+		} else if (type.equals("mongo")) {
+			File mongoDir = new File(mongoPath.toString());
+			if (!mongoDir.exists()) {
+				mongoDir.mkdir();
+			}
+			List<String> mongoDb = Arrays.asList("crm", "security", "loan", "deposit", "generalledger",
+					"configuration");
+			for (String db : mongoDb) {
+				ProcessBuilder pb = new ProcessBuilder("mongodump", "--db", db, "--out", mongoPath.toString());
+				pb.redirectErrorStream(true);
+
+				try {
+					Process p = pb.start();
+//						BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//						String line;
+//						while ((line = reader.readLine()) != null)
+//						    System.out.println("tasklist: " + line);
+					int exitcode = p.waitFor();
+					System.out.println(exitcode);
+					if (exitcode == 0) {
+						System.out.println("Mongo backup created successfully");
+						result = true;
+					} else {
+						System.out.println("Error creating Mongo backup");
+					}
+
+				} catch (Exception e) {
+					System.out.println(e.getMessage());
+				}
+			}
+			result = true;
+
+		} else {
+			System.out.println("Invalid type");
+			result = false;
+		}
+		return result;
+	}
+
+	public Boolean zipMysql() {
+		boolean foo = false;
+		String sourceFile = mysqlPath + "\\mysql.sql";
+		String targetFile = mysqlPath + "\\mysql.zip";
+
+		try (FileOutputStream fos = new FileOutputStream(targetFile);
+				ZipOutputStream zipOut = new ZipOutputStream(fos);
+				FileInputStream fis = new FileInputStream(sourceFile)) {
+
+			File fileToZip = new File(sourceFile);
+			ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
+			zipOut.putNextEntry(zipEntry);
+
+			byte[] bytes = new byte[1024];
+			int length;
+			while ((length = fis.read(bytes)) >= 0) {
+				zipOut.write(bytes, 0, length);
+			}
+
+			zipOut.closeEntry();
+			foo = true;
+		} catch (IOException e) {
+			// Handle IO errors
+			e.printStackTrace();
+			foo = false;
+		}
+
+		return foo;
+	}
+
+	public boolean zipMongo() throws ZipException {
+		File file = new File(mongoPath + "\\mongo.zip");
+		ZipParameters zipParameters = new ZipParameters();
+		boolean result = false;
+		if (file.exists()) {
+			file.delete();
+		}
+		try (ZipFile zipFile = new ZipFile(mongoPath + File.separator + "mongo.zip")) {
+			zipFile.addFolder(new File(mongoPath.toString()), zipParameters);
+			result = true;
+		} catch (ZipException e) {
+			result = false;
+			System.out.println(e);
+			throw e;
+		} catch (IOException e) {
+			result = false;
+			System.out.println(e.getMessage());
+			e.printStackTrace();
+		}
+		return result;
+
+	}
+
 }
